@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { emberfall as universe } from "@/lib/data/emberfall";
 import { authorStats, claimMap, entityMap, lineage, verdictOf, visibleEntityIds, visibleTheories } from "@/lib/lore";
-import { useLore } from "@/lib/store";
+import { useLore, useUniverse } from "@/lib/store";
 import type { EntityKind, SourceKind, Theory } from "@/lib/types";
 import { KIND_COLOR, KIND_LABEL, SOURCE_LABEL } from "./kinds";
 
@@ -30,7 +29,11 @@ function Chip({ on, onClick, children, color }: { on: boolean; onClick: () => vo
 
 function Filters() {
   const s = useLore();
-  const regions = [...new Set(universe.entities.map((e) => e.region).filter((r): r is string => !!r))];
+  const universe = useUniverse();
+  const unlocked = visibleEntityIds(universe, s.progress);
+  const results = s.query.trim() ? universe.entities.filter((entity) => unlocked.has(entity.id) &&
+    `${entity.name} ${entity.summary}`.toLowerCase().includes(s.query.trim().toLowerCase())) : [];
+  const regions = [...new Set(universe.entities.filter((e) => unlocked.has(e.id)).map((e) => e.region).filter((r): r is string => !!r))];
   const active = s.kinds.length + s.sourceKinds.length + (s.region ? 1 : 0) + (s.query ? 1 : 0);
 
   return (
@@ -44,11 +47,18 @@ function Filters() {
         )}
       </div>
       <input
+        aria-label="Search unlocked names"
         value={s.query}
         onChange={(e) => s.setQuery(e.target.value)}
         placeholder="Search names…"
         className="w-full border border-line bg-bg px-2.5 py-1.5 text-sm text-ink outline-none placeholder:text-muted focus:border-ember"
       />
+      {s.query.trim() && <div className="mt-2 border border-line" aria-label="Search results">
+        {results.length ? results.slice(0, 8).map((entity) => <button key={entity.id} onClick={() => s.exploreEntity(entity.id)}
+          className="block min-h-10 w-full border-b border-line px-3 py-2 text-left text-xs text-ink last:border-0 hover:bg-panel2">
+          {entity.name} <span className="float-right text-ember">jump ↗</span>
+        </button>) : <p className="p-3 text-xs text-muted">No unlocked matches.</p>}
+      </div>}
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(Object.keys(KIND_LABEL) as EntityKind[]).map((k) => (
           <Chip key={k} on={s.kinds.includes(k)} onClick={() => s.toggleKind(k)} color={KIND_COLOR[k]}>
@@ -68,6 +78,7 @@ function Filters() {
       </div>
       <div className="eyebrow mb-1.5 mt-4">Region</div>
       <select
+        aria-label="Filter by region"
         value={s.region}
         onChange={(e) => s.setRegion(e.target.value)}
         className="w-full border border-line bg-bg px-2 py-1.5 text-sm text-ink outline-none focus:border-ember"
@@ -85,6 +96,7 @@ function Filters() {
 
 function AddClaim({ theory }: { theory: Theory }) {
   const s = useLore();
+  const universe = useUniverse();
   const [subject, setSubject] = useState("");
   const [predicate, setPredicate] = useState("");
   const [object, setObject] = useState("");
@@ -93,7 +105,7 @@ function AddClaim({ theory }: { theory: Theory }) {
   const options = useMemo(() => {
     const unlocked = visibleEntityIds(universe, s.progress);
     return universe.entities.filter((e) => unlocked.has(e.id));
-  }, [s.progress]);
+  }, [s.progress, universe]);
 
   const ready = subject && object && subject !== object && predicate.trim() && text.trim();
 
@@ -157,15 +169,16 @@ function AddClaim({ theory }: { theory: Theory }) {
 
 function Theories() {
   const s = useLore();
+  const universe = useUniverse();
   const ents = entityMap(universe);
   const claims = claimMap(universe);
 
   const all = useMemo(
     () => visibleTheories([...universe.theories, ...s.userTheories], s.progress),
-    [s.userTheories, s.progress],
+    [s.userTheories, s.progress, universe],
   );
   const active = all.find((t) => t.id === s.activeTheoryId) ?? null;
-  const stats = useMemo(() => authorStats(universe, all, s.progress), [all, s.progress]);
+  const stats = useMemo(() => authorStats(universe, all, s.progress), [all, s.progress, universe]);
 
   return (
     <section className="p-4">
@@ -262,11 +275,40 @@ function Theories() {
   );
 }
 
+function MainStory() {
+  const universe = useUniverse();
+  const s = useLore();
+  return <section className="border-b border-line p-4">
+    <div className="eyebrow !text-ember">Start here · canon</div>
+    <h1 className="mt-1 font-serif text-2xl text-ink">The main story</h1>
+    <p className="mt-2 text-xs leading-relaxed text-muted">{universe.tagline}</p>
+    <ol className="mt-4 border-l border-line">
+      {universe.story.map((step, index) => {
+        const locked = step.stage > s.progress;
+        return <li key={step.id}>
+          <button onClick={() => locked ? s.requestStage(step.stage) : s.exploreEntity(step.entityId)}
+            className={`flex w-full gap-3 border-l-2 px-3 py-3 text-left hover:bg-panel2 ${s.selectedEntity === step.entityId ? "border-ember bg-panel2" : "border-transparent"}`}>
+            <span className="pt-0.5 font-mono text-[10px] text-ember">{String(index + 1).padStart(2, "0")}</span>
+            <span><span className="block font-serif text-[15px] leading-snug text-ink">{locked ? `Part ${index + 1} · behind the shield` : step.title}</span>
+              <span className="mt-1 block text-[11px] leading-relaxed text-muted">{locked ? "Unlock the release to follow this part." : step.summary}</span></span>
+          </button>
+        </li>;
+      })}
+    </ol>
+    {!universe.storyComplete && <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+      The main story is still being mapped. Canon side lore comes later; theory branches open after the main story is complete.
+    </p>}
+  </section>;
+}
+
 export function LeftPanel() {
+  const panel = useLore((s) => s.mobilePanel);
+  const universe = useUniverse();
   return (
-    <aside className="hidden w-80 shrink-0 overflow-y-auto border-r border-line bg-panel lg:block">
+    <aside aria-label="Main story and exploration" className={`${panel === "explore" ? "block" : "hidden"} w-full shrink-0 overflow-y-auto border-r border-line bg-panel lg:block lg:w-72 xl:w-80`}>
+      <MainStory />
       <Filters />
-      <Theories />
+      {universe.storyComplete && <Theories />}
     </aside>
   );
 }

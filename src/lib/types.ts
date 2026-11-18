@@ -56,9 +56,13 @@ export interface Claim {
   text: string;
   /** In-universe year, if known. Negative = before year 0. */
   when?: number;
+  /** Narrative sequence when no in-universe date is known. Never a fictional year. */
+  storyOrder?: number;
   /** Stage in which this claim became knowable. Drives the spoiler shield. */
   stage: number;
   sourceIds: string[];
+  /** Canon side lore is marked explicitly. Existing claims belong to the main story. */
+  track?: "side";
   /** Set when this claim and another canon claim cannot both be true. */
   contradicts?: string;
   /** Short label for a contradiction: "plot hole", "retcon", "translation". */
@@ -94,10 +98,24 @@ export interface Theory {
   claims: TheoryClaim[];
 }
 
+export interface StoryStep {
+  id: string;
+  title: string;
+  summary: string;
+  stage: number;
+  entityId: string;
+  sourceIds: string[];
+}
+
 export interface Universe {
   id: string;
   name: string;
   tagline: string;
+  /** Every universe starts with its canon main story. Side lore comes later. */
+  story: StoryStep[];
+  storyComplete: boolean;
+  coverage: string;
+  initialProgress?: number;
   stages: Stage[];
   sources: Source[];
   entities: Entity[];

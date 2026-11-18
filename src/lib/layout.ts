@@ -13,7 +13,7 @@ const ROW_H = 74;
 /**
  * Timeline: x is time, y is a lane per kind. Nodes that collide in a lane
  * are pushed into extra rows, so nothing overlaps.
- * axis "story"   = in-universe year
+ * axis "story"   = narrative sequence when supplied, otherwise in-universe year
  * axis "release" = the order the lore reached players
  */
 export function timelineLayout(u: Universe, axis: "story" | "release"): Map<string, Pos> {
@@ -35,8 +35,8 @@ export function timelineLayout(u: Universe, axis: "story" | "release"): Map<stri
     const own = new Map<string, number>();
     for (const e of u.entities) {
       const mine = u.claims
-        .filter((c) => (c.subject === e.id || c.object === e.id) && c.when !== undefined)
-        .map((c) => c.when as number);
+        .filter((c) => (c.subject === e.id || c.object === e.id) && (c.storyOrder ?? c.when) !== undefined)
+        .map((c) => (c.storyOrder ?? c.when) as number);
       if (mine.length) own.set(e.id, Math.min(...mine));
     }
     const ranks = [...new Set(own.values())].sort((a, b) => a - b);

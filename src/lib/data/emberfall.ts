@@ -8,6 +8,14 @@ import type { Universe } from "../types";
 export const emberfall: Universe = {
   id: "emberfall",
   name: "Emberfall",
+  coverage: "Invented demo · complete main story",
+  storyComplete: true,
+  story: [
+    { id: "crown", title: "The crown and its makers", summary: "Begin with the artifact and the accounts of its forging.", stage: 0, entityId: "crown", sourceIds: ["s2"] },
+    { id: "fall", title: "The fall of Emberfall", summary: "Trace the disaster that ended the kingdom.", stage: 0, entityId: "sundering", sourceIds: ["s1"] },
+    { id: "keepers", title: "The surviving keepers", summary: "Follow Ilen and the Order after the fall.", stage: 1, entityId: "ilen", sourceIds: ["s3", "s5"] },
+    { id: "wick", title: "The Last Wick", summary: "Return to the flame at the center of the story.", stage: 3, entityId: "wick", sourceIds: ["s6", "s7"] },
+  ],
   tagline: "A demo world: one crown, two forgers, and a war that nobody agrees how it started.",
   stages: [
     { order: 0, id: "v1.0", label: "1.0 · Launch" },
@@ -45,7 +53,7 @@ export const emberfall: Universe = {
     { id: "c5", subject: "sundering", predicate: "destroyed", object: "emberfall", text: "The Sundering ended the kingdom of Emberfall.", when: 0, stage: 0, sourceIds: ["s1"] },
     { id: "c6", subject: "ilen", predicate: "carried out", object: "crown", text: "Ilen admits she carried the crown out of the ruins.", when: 2, stage: 1, sourceIds: ["s3"] },
     { id: "c7", subject: "ilen", predicate: "founded", object: "moth", text: "Ilen is credited with founding the Moth Order.", when: 10, stage: 1, sourceIds: ["s5"] },
-    { id: "c8", subject: "moth", predicate: "guards", object: "lantern", text: "The Order watches over Lantern Vale.", when: 12, stage: 1, sourceIds: ["s5"] },
+    { id: "c8", subject: "moth", predicate: "guards", object: "lantern", text: "The Order watches over Lantern Vale.", when: 12, stage: 1, sourceIds: ["s5"], track: "side" },
     { id: "c9", subject: "kethra", predicate: "is the name of", object: "oath", text: "\"Kethra\" is the old word for the Oath.", stage: 1, sourceIds: ["s3"] },
     { id: "c10", subject: "oath", predicate: "binds", object: "crown", text: "The Oath is what binds the crown to whoever wears it.", when: -305, stage: 2, sourceIds: ["s4"] },
     { id: "c11", subject: "oren", predicate: "broke", object: "oath", text: "Oren is shown breaking the Oath the night before the Sundering.", when: -1, stage: 2, sourceIds: ["s4"] },

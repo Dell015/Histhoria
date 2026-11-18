@@ -1,5 +1,60 @@
 @import "tailwindcss";
 
+.spatial-surface {
+  touch-action: none;
+  user-select: none;
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, #e8b88620 0.65px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.spatial-node {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  transform: translate(-50%, -50%);
+}
+
+.spatial-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 100%;
+  border: 1px solid currentColor;
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+}
+
+.spatial-landmark .spatial-dot { width: 13px; height: 13px; outline: 1px solid currentColor; outline-offset: 3px; }
+.spatial-selected .spatial-dot { color: #ffad79; outline: 1px solid currentColor; outline-offset: 5px; }
+.spatial-dim { opacity: 0.37; }
+.spatial-node:hover, .spatial-node:focus-visible { opacity: 1; z-index: 10000 !important; }
+.spatial-label {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  width: max-content;
+  max-width: 144px;
+  transform: translateX(-50%);
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.15;
+  pointer-events: none;
+}
+.spatial-label small { display: block; color: var(--muted); font: 9px var(--font-mono); margin-bottom: 3px; }
+.spatial-selected .spatial-label { border-color: var(--ember); }
+.spatial-label-visible, .spatial-node:is(:hover, :focus-visible) .spatial-label { display: block; }
+.spatial-control { min-width: 34px; min-height: 34px; color: var(--muted); border-right: 1px solid var(--line); }
+.spatial-control:last-child { border-right: 0; }
+.spatial-control:hover:enabled { color: var(--text); background: var(--panel-2); }
+.spatial-control:disabled { opacity: .35; cursor: default; }
+
 :root {
   --bg: #0e0c0a;
   --panel: #161310;
@@ -37,6 +92,12 @@ body {
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+
+button, select, input, textarea { font-family: inherit; }
+button, select { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; }
+input, select, textarea { border-radius: 0; }
+* { scrollbar-width: thin; scrollbar-color: var(--muted) var(--panel); }
 
 .eyebrow {
   font-family: var(--font-mono);

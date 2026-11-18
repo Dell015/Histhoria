@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { EntityKind, SourceKind, Theory, TheoryClaim } from "./types";
+import { defaultUniverse, universes } from "./data/universes";
 
 const KEY = "histhoria-v1";
 
@@ -8,24 +9,34 @@ interface Saved {
   userTheories: Theory[];
 }
 
-function load(): Saved | null {
+function storageKey(universeId: string) {
+  // Keep existing Emberfall forks and progress under their original key.
+  return universeId === "emberfall" ? KEY : `${KEY}:${universeId}`;
+}
+
+function load(universeId: string): Saved | null {
   try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Saved) : null;
+    const raw = window.localStorage.getItem(storageKey(universeId));
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<Saved>;
+    const universe = universes[universeId];
+    if (!universe.stages.some((stage) => stage.order === saved.progress)) return null;
+    return { progress: saved.progress!, userTheories: Array.isArray(saved.userTheories) ? saved.userTheories : [] };
   } catch {
     return null;
   }
 }
 
-function save(s: Saved) {
+function save(universeId: string, s: Saved) {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(s));
+    window.localStorage.setItem(storageKey(universeId), JSON.stringify(s));
   } catch {
     /* private mode or blocked storage: the app still works, it just forgets */
   }
 }
 
 interface State {
+  universeId: string;
   hydrated: boolean;
   /** Highest release stage the viewer has agreed to see. */
   progress: number;
@@ -38,6 +49,10 @@ interface State {
   selectedEntity: string | null;
   selectedClaim: string | null;
   activeTheoryId: string | null;
+  neighborhoodRoot: string | null;
+  neighborhoodDepth: 1 | 2;
+  focusRequest: number;
+  mobilePanel: "explore" | "trace" | null;
 
   kinds: EntityKind[];
   sourceKinds: SourceKind[];
@@ -47,6 +62,11 @@ interface State {
   userTheories: Theory[];
 
   hydrate: () => void;
+  setUniverse: (id: string) => void;
+  exploreEntity: (id: string) => void;
+  showNeighborhood: (id: string | null) => void;
+  setNeighborhoodDepth: (depth: 1 | 2) => void;
+  setMobilePanel: (panel: State["mobilePanel"]) => void;
   requestStage: (n: number) => void;
   confirmStage: () => void;
   cancelStage: () => void;
@@ -65,19 +85,24 @@ interface State {
 }
 
 const persist = (get: () => State) => {
-  const { progress, userTheories } = get();
-  save({ progress, userTheories });
+  const { universeId, progress, userTheories } = get();
+  save(universeId, { progress, userTheories });
 };
 
 export const useLore = create<State>((set, get) => ({
+  universeId: defaultUniverse.id,
   hydrated: false,
-  progress: 0,
+  progress: defaultUniverse.initialProgress ?? 0,
   pendingStage: null,
   view: "timeline",
   axis: "story",
   selectedEntity: null,
   selectedClaim: null,
   activeTheoryId: null,
+  neighborhoodRoot: null,
+  neighborhoodDepth: 1,
+  focusRequest: 0,
+  mobilePanel: null,
   kinds: [],
   sourceKinds: [],
   region: "",
@@ -85,17 +110,45 @@ export const useLore = create<State>((set, get) => ({
   userTheories: [],
 
   hydrate: () => {
-    const saved = load();
+    const universe = universes[get().universeId];
+    const saved = load(universe.id);
     set({
       hydrated: true,
-      progress: saved?.progress ?? 0,
+      progress: saved?.progress ?? universe.initialProgress ?? 0,
       userTheories: saved?.userTheories ?? [],
     });
   },
 
+  setUniverse: (id) => {
+    const universe = universes[id];
+    if (!universe || id === get().universeId) return;
+    const saved = load(id);
+    set({
+      universeId: id, progress: saved?.progress ?? universe.initialProgress ?? 0,
+      userTheories: saved?.userTheories ?? [], pendingStage: null,
+      selectedEntity: null, selectedClaim: null, activeTheoryId: null,
+      neighborhoodRoot: null, neighborhoodDepth: 1, mobilePanel: null,
+      kinds: [], sourceKinds: [], region: "", query: "", view: "timeline", axis: "story",
+    });
+  },
+  exploreEntity: (id) => set((s) => ({
+    selectedEntity: id, selectedClaim: null, query: "", kinds: [], sourceKinds: [], region: "",
+    neighborhoodRoot: s.neighborhoodRoot ? id : null,
+    focusRequest: s.focusRequest + 1, mobilePanel: "trace",
+  })),
+  showNeighborhood: (id) => set((s) => ({
+    neighborhoodRoot: id, selectedEntity: id, selectedClaim: null,
+    kinds: [], sourceKinds: [], region: "", query: "", focusRequest: s.focusRequest + 1,
+  })),
+  setNeighborhoodDepth: (neighborhoodDepth) => set({ neighborhoodDepth }),
+  setMobilePanel: (mobilePanel) => set((s) => ({ mobilePanel,
+    focusRequest: mobilePanel === null && s.selectedEntity ? s.focusRequest + 1 : s.focusRequest,
+  })),
+
   requestStage: (n) => {
+    if (!universes[get().universeId].stages.some((stage) => stage.order === n)) return;
     if (n <= get().progress) {
-      set({ progress: n, pendingStage: null });
+      set({ progress: n, pendingStage: null, selectedEntity: null, selectedClaim: null, activeTheoryId: null, neighborhoodRoot: null });
       persist(get);
     } else {
       set({ pendingStage: n });
@@ -111,7 +164,7 @@ export const useLore = create<State>((set, get) => ({
 
   setView: (view) => set({ view }),
   setAxis: (axis) => set({ axis }),
-  selectEntity: (id) => set({ selectedEntity: id, selectedClaim: null }),
+  selectEntity: (id) => set({ selectedEntity: id, selectedClaim: null, mobilePanel: id ? "trace" : null }),
   selectClaim: (id) => set({ selectedClaim: id }),
   setActiveTheory: (id) => set({ activeTheoryId: id }),
 
@@ -126,6 +179,7 @@ export const useLore = create<State>((set, get) => ({
   clearFilters: () => set({ kinds: [], sourceKinds: [], region: "", query: "" }),
 
   forkTheory: (source, author) => {
+    if (!universes[get().universeId].storyComplete) return "";
     const id = `u-${Date.now().toString(36)}`;
     const fork: Theory = {
       ...source,
@@ -144,6 +198,7 @@ export const useLore = create<State>((set, get) => ({
   },
 
   addTheoryClaim: (theoryId, claim) => {
+    if (!universes[get().universeId].storyComplete) return;
     set((s) => ({
       userTheories: s.userTheories.map((t) =>
         t.id === theoryId ? { ...t, claims: [...t.claims, { ...claim, id: `${theoryId}-${t.claims.length}` }] } : t,
@@ -152,3 +207,7 @@ export const useLore = create<State>((set, get) => ({
     persist(get);
   },
 }));
+
+export function useUniverse() {
+  return universes[useLore((s) => s.universeId)];
+}

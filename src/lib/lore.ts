@@ -44,6 +44,35 @@ export interface Trace {
   claimIds: Set<string>;
 }
 
+/** Undirected, bounded neighborhood, built only from already-unlocked arrows. */
+export function neighborhoodFrom(
+  claims: Pick<Claim, "subject" | "object">[],
+  entityId: string,
+  maxDepth = 1,
+): Set<string> {
+  const adjacent = new Map<string, Set<string>>();
+  for (const claim of claims) {
+    for (const [from, to] of [[claim.subject, claim.object], [claim.object, claim.subject]]) {
+      if (!adjacent.has(from)) adjacent.set(from, new Set());
+      adjacent.get(from)!.add(to);
+    }
+  }
+  const seen = new Set([entityId]);
+  let frontier = [entityId];
+  for (let depth = 0; depth < maxDepth && frontier.length; depth++) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const neighbor of adjacent.get(id) ?? []) {
+        if (seen.has(neighbor)) continue;
+        seen.add(neighbor);
+        next.push(neighbor);
+      }
+    }
+    frontier = next;
+  }
+  return seen;
+}
+
 /**
  * Walk the claim arrows from one entity in both directions.
  * Subject -> object means "leads to", so upstream follows arrows backwards.

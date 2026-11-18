@@ -67,7 +67,40 @@ claim, so no one ever has to resolve text conflicts.
 
 ## What is built
 
-- Timeline (story order or release order) and Web views, pan and zoom, minimap
+### 3D views and evidence
+
+Both views project the same filtered lore onto a canvas with keyboard
+accessible HTML nodes. The time stream places main-story steps along its
+horizontal axis and moves related entities into depth. Sourced claims marked
+`track: "side"` are optional in the stream and included in the connection
+map. The spatial guide is navigation and claim arrows are the relationships.
+The map uses stable three-dimensional positions so filters keep spatial
+context. The Emberfall demo exercises side lore using an existing sourced
+claim. Genshin content still follows the main-story-first plan.
+
+Attachments have their own records indexed by universe and canon claim. They
+are personal supplemental evidence. Curated citations remain in `sourceIds`.
+Browser storage holds the actual file bytes and avoids putting video or image
+data into localStorage. The app never fetches previews from saved link URLs.
+See `docs/3D_AND_EVIDENCE.md` and `docs/CHANGES.md`.
+
+### November 18 continuation
+
+The owner clarified the product order: each game's canon main story is the
+default backbone, canon side lore branches come afterward, and theory tools
+open only after the main-story backbone is complete. This is content readiness,
+not a viewer's spoiler progress. `Universe.storyComplete` enforces the gate in
+both the UI and store mutations. Genshin remains incomplete and has no seeded
+theories. Emberfall is the complete invented demo.
+
+Added Genshin's Mondstadt prologue as the first researched main-story slice,
+ordered story entry points per universe, explicit search navigation, one/two-link
+neighborhoods, separate universe saves, and phone panel navigation. Narrative
+sequence uses `storyOrder`; release stage keeps its original meaning. The
+Genshin shield currently unlocks the whole included 1.0 prologue together.
+See `docs/GENSHIN_RESEARCH.md` for source provenance and expansion order.
+
+- Time stream (story or release order) and connection map, with orbit and zoom
 - Click to trace: upstream and downstream, everything else fades
 - Filters: kind, source type, region, search
 - Spoiler shield with confirm-before-reveal
@@ -81,12 +114,14 @@ claim, so no one ever has to resolve text conflicts.
 - Accounts, votes, comments (need a backend; Supabase is the likely fit)
 - Merge requests
 - Editing canon (right now canon is a TypeScript file)
-- Real universes (Valorant, Mobile Legends)
-- Phone layout (panels are desktop only for now)
+- Full Genshin main-story coverage and additional real universes
+- Quest-level spoiler progress inside a single release
 - Open JSON export
 
 ## Next steps, in order
 
-1. Pick the first real universe and decide how its first slice is entered.
-2. Move canon to a database with accounts, so people other than us can add.
-3. Merge requests, then votes and comments.
+1. Continue researching and entering Genshin's main Archon Quest path; Liyue
+   and the connecting Traveler quests are next. Keep theory creation closed.
+2. Complete the intended main-story scope, then attach sourced canon side lore.
+3. Open theory branches after the main-story backbone is complete. Backend,
+   accounts, and collaboration remain future work.

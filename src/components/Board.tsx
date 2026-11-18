@@ -1,187 +1,132 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import {
-  Background,
-  Controls,
-  MarkerType,
-  ReactFlow,
-  ReactFlowProvider,
-  useReactFlow,
-  type Edge,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { emberfall as universe } from "@/lib/data/emberfall";
-import { timelineLayout, webLayout } from "@/lib/layout";
-import { entityMap, sourceMap, traceFrom, visibleClaims, visibleEntityIds, verdictOf } from "@/lib/lore";
-import { useLore } from "@/lib/store";
-import { LoreNode, type LoreFlowNode } from "./LoreNode";
+import { useMemo, useState } from "react";
+import { neighborhoodFrom, sourceMap, traceFrom, visibleClaims, verdictOf } from "@/lib/lore";
+import { connectionLayout, streamLayout } from "@/lib/spatial";
+import { useLore, useUniverse } from "@/lib/store";
+import { SpatialScene, type SceneEdge, type SceneNode } from "./SpatialScene";
 
-const nodeTypes = { lore: LoreNode };
-
-const VERDICT_GLYPH = { confirmed: "✓", partial: "≈", refuted: "✕", open: "?" } as const;
-const VERDICT_COLOR = {
-  confirmed: "#8fc49a",
-  partial: "#e5b84a",
-  refuted: "#e0433a",
-  open: "#5fb8a8",
-} as const;
-
-function BoardInner() {
-  const s = useLore();
-  const { fitView } = useReactFlow();
-
-  const positions = useMemo(
-    () => (s.view === "web" ? webLayout(universe) : timelineLayout(universe, s.axis)),
-    [s.view, s.axis],
-  );
-
-  const { nodes, edges } = useMemo(() => {
-    const ents = entityMap(universe);
-    const srcs = sourceMap(universe);
-    const unlocked = visibleEntityIds(universe, s.progress);
-    const q = s.query.trim().toLowerCase();
-
-    const entityShown = (id: string) => {
-      if (!unlocked.has(id)) return false;
-      const e = ents.get(id)!;
-      if (s.kinds.length && !s.kinds.includes(e.kind)) return false;
-      if (s.region && e.region !== s.region) return false;
-      if (q && !e.name.toLowerCase().includes(q) && !e.summary.toLowerCase().includes(q)) return false;
-      return true;
-    };
-
-    const claims = visibleClaims(universe, s.progress).filter((c) => {
-      if (!entityShown(c.subject) || !entityShown(c.object)) return false;
-      if (s.sourceKinds.length) {
-        return c.sourceIds.some((id) => s.sourceKinds.includes(srcs.get(id)!.kind));
-      }
-      return true;
-    });
-
-    const trace = s.selectedEntity ? traceFrom(claims, s.selectedEntity) : null;
-
-    const theories = [...universe.theories, ...s.userTheories].filter((t) => t.postedAtStage <= s.progress);
-    const theory = theories.find((t) => t.id === s.activeTheoryId) ?? null;
-    const theoryClaims = theory
-      ? theory.claims.filter((tc) => entityShown(tc.subject) && entityShown(tc.object))
-      : [];
-    const touched = new Set(theoryClaims.flatMap((tc) => [tc.subject, tc.object]));
-
-    const contradicted = new Set(
-      claims.filter((c) => c.contradicts).flatMap((c) => [c.subject, c.object]),
-    );
-
-    const nodes: LoreFlowNode[] = universe.entities
-      .filter((e) => entityShown(e.id))
-      .map((e) => {
-        const role: LoreFlowNode["data"]["role"] = !trace
-          ? null
-          : e.id === s.selectedEntity
-            ? "self"
-            : trace.upstream.has(e.id)
-              ? "up"
-              : trace.downstream.has(e.id)
-                ? "down"
-                : null;
-        return {
-          id: e.id,
-          type: "lore",
-          position: positions.get(e.id) ?? { x: 0, y: 0 },
-          draggable: false,
-          selected: e.id === s.selectedEntity,
-          data: {
-            name: e.name,
-            kind: e.kind,
-            role,
-            dim: !!trace && role === null,
-            contradicted: contradicted.has(e.id),
-            theoryTouch: touched.has(e.id),
-          },
-        };
-      });
-
-    const canonEdges: Edge[] = claims.map((c) => {
-      const inTrace = !trace || trace.claimIds.has(c.id);
-      const isContra = !!c.contradicts;
-      const picked = s.selectedClaim === c.id;
-      const color = isContra ? "#e0433a" : picked ? "#e8743b" : "#d9cfb8";
-      return {
-        id: c.id,
-        source: c.subject,
-        target: c.object,
-        label: c.predicate + (isContra ? "  ⚠" : ""),
-        labelStyle: { fill: isContra ? "#e0433a" : "#d9cfb8", fontSize: 11, fontFamily: "ui-monospace, monospace" },
-        labelBgStyle: { fill: "#0e0c0a" },
-        labelBgPadding: [4, 2],
-        style: {
-          stroke: color,
-          strokeWidth: picked ? 2.6 : 1.5,
-          strokeDasharray: isContra ? "6 4" : undefined,
-          opacity: inTrace ? (trace ? 1 : 0.7) : 0.08,
-        },
-        markerEnd: { type: MarkerType.ArrowClosed, color },
-      };
-    });
-
-    const theoryEdges: Edge[] = theoryClaims.map((tc) => {
-      const v = verdictOf(universe, tc, s.progress);
-      const color = VERDICT_COLOR[v];
-      return {
-        id: `theory-${tc.id}`,
-        source: tc.subject,
-        target: tc.object,
-        label: `${VERDICT_GLYPH[v]} ${tc.predicate}`,
-        labelStyle: { fill: color, fontSize: 11, fontFamily: "ui-monospace, monospace" },
-        labelBgStyle: { fill: "#0e0c0a" },
-        labelBgPadding: [4, 2],
-        className: v === "open" ? "edge-theory" : undefined,
-        style: {
-          stroke: color,
-          strokeWidth: 2,
-          strokeDasharray: "8 6",
-          opacity: trace ? 0.25 : 0.95,
-        },
-        markerEnd: { type: MarkerType.ArrowClosed, color },
-      };
-    });
-
-    return { nodes, edges: [...canonEdges, ...theoryEdges] };
-  }, [s.progress, s.query, s.kinds, s.region, s.sourceKinds, s.selectedEntity, s.selectedClaim, s.activeTheoryId, s.userTheories, positions]);
-
-  // Re-frame when the arrangement or the set of unlocked lore changes,
-  // not on every click.
-  useEffect(() => {
-    const t = window.setTimeout(() => fitView({ padding: 0.18, duration: 450 }), 60);
-    return () => window.clearTimeout(t);
-  }, [s.view, s.axis, s.progress, fitView]);
-
-  return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      onNodeClick={(_, n) => s.selectEntity(n.id)}
-      onEdgeClick={(_, e) => {
-        if (!e.id.startsWith("theory-")) s.selectClaim(e.id);
-      }}
-      onPaneClick={() => s.selectEntity(null)}
-      nodesConnectable={false}
-      minZoom={0.15}
-      maxZoom={1.8}
-      fitView
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background gap={36} size={1} color="rgba(238,228,208,0.07)" />
-      <Controls showInteractive={false} />
-    </ReactFlow>
-  );
-}
+const verdictColors = { confirmed: "#8fc49a", partial: "#e5b84a", refuted: "#e0433a", open: "#5fb8a8" };
 
 export function Board() {
-  return (
-    <ReactFlowProvider>
-      <BoardInner />
-    </ReactFlowProvider>
-  );
+  const s = useLore();
+  const universe = useUniverse();
+  const [showSide, setShowSide] = useState(true);
+  const timeline = s.view === "timeline";
+  const sideVisible = showSide || !timeline;
+  const { progress, axis, query, kinds, region, sourceKinds, selectedEntity, neighborhoodRoot,
+    neighborhoodDepth, activeTheoryId, userTheories } = s;
+  const positions = useMemo(() => timeline ? streamLayout(universe, axis) : connectionLayout(universe), [axis, timeline, universe]);
+  const { nodes, edges, storyIds, sideCount } = useMemo(() => {
+    const unlocked = visibleClaims(universe, progress);
+    const mainClaims = unlocked.filter((claim) => claim.track !== "side");
+    const mainIds = new Set(mainClaims.flatMap((claim) => [claim.subject, claim.object]));
+    const landmarks = new Map(universe.story.filter((step) => step.stage <= progress).map((step, index) =>
+      [step.entityId, axis === "release" && timeline
+        ? universe.stages.find((stage) => stage.order === step.stage)?.label ?? "Main story"
+        : `Story ${String(index + 1).padStart(2, "0")}`]));
+    const canon = sideVisible ? unlocked : mainClaims;
+    const unlockedIds = new Set(canon.flatMap((claim) => [claim.subject, claim.object]));
+    for (const id of landmarks.keys()) unlockedIds.add(id);
+    const theory = universe.storyComplete ? [...universe.theories, ...userTheories]
+      .find((item) => item.id === activeTheoryId && item.postedAtStage <= progress) : undefined;
+    const theoryClaims = (theory?.claims ?? []).filter((claim) => unlockedIds.has(claim.subject) && unlockedIds.has(claim.object));
+    const nearby = neighborhoodRoot ? neighborhoodFrom([...canon, ...theoryClaims], neighborhoodRoot, neighborhoodDepth) : null;
+    const q = query.trim().toLowerCase();
+    const shown = universe.entities.filter((entity) => unlockedIds.has(entity.id)
+      && (!nearby || nearby.has(entity.id))
+      && (!kinds.length || kinds.includes(entity.kind))
+      && (!region || entity.region === region)
+      && (!q || `${entity.name} ${entity.summary}`.toLowerCase().includes(q)));
+    const shownIds = new Set(shown.map((entity) => entity.id));
+    const sourceById = sourceMap(universe);
+    const links = canon.filter((claim) => shownIds.has(claim.subject) && shownIds.has(claim.object)
+      && (!sourceKinds.length || claim.sourceIds.some((id) => {
+        const source = sourceById.get(id);
+        return source && sourceKinds.includes(source.kind);
+      })));
+    const trace = selectedEntity && shownIds.has(selectedEntity) ? traceFrom(links, selectedEntity) : null;
+    const nodes: SceneNode[] = shown.map((entity) => ({
+      id: entity.id, name: entity.name, kind: entity.kind, landmark: landmarks.get(entity.id),
+      sideOnly: !mainIds.has(entity.id) && !landmarks.has(entity.id),
+      dim: !!trace && entity.id !== selectedEntity && !trace.upstream.has(entity.id) && !trace.downstream.has(entity.id),
+    }));
+    const edges: SceneEdge[] = links.map((claim) => ({
+      id: claim.id, from: claim.subject, to: claim.object, label: claim.predicate,
+      color: claim.contradicts ? "#e0433a" : claim.track === "side" ? "#74bcad" : "#d9cfb8",
+      dashed: !!claim.contradicts,
+      opacity: trace ? trace.claimIds.has(claim.id) ? 0.74 : 0.11 : 0.44,
+    }));
+    for (const claim of theoryClaims) {
+      if (!shownIds.has(claim.subject) || !shownIds.has(claim.object)) continue;
+      edges.push({
+        id: `theory-${claim.id}`, from: claim.subject, to: claim.object, label: claim.predicate,
+        color: verdictColors[verdictOf(universe, claim, progress)], opacity: 0.85, dashed: true, theory: true,
+      });
+    }
+    const storyIds = [...landmarks.keys()].filter((id) => shownIds.has(id));
+    if (axis === "release" && timeline) storyIds.sort((a, b) => positions.get(a)!.x - positions.get(b)!.x);
+    return { nodes, edges, storyIds,
+      sideCount: unlocked.length - mainClaims.length };
+  }, [activeTheoryId, axis, kinds, neighborhoodDepth, neighborhoodRoot, progress, query,
+    positions, region, selectedEntity, sideVisible, sourceKinds, timeline, universe, userTheories]);
+
+  const storyIndex = storyIds.indexOf(s.selectedEntity ?? "");
+  const stepBy = (n: number) => {
+    const id = storyIds[storyIndex + n];
+    if (!id) return;
+    s.exploreEntity(id);
+    s.setMobilePanel(null);
+  };
+
+  return <div className="relative h-full w-full">
+    {nodes.length > 0 && <SpatialScene timeline={timeline} positions={positions} nodes={nodes} edges={edges}
+      storyIds={storyIds} selectedEntity={s.selectedEntity} selectedClaim={s.selectedClaim}
+      focusRequest={s.focusRequest} neighborhood={!!neighborhoodRoot}
+      frameKey={`${s.view}:${axis}:${progress}:${neighborhoodRoot}:${neighborhoodDepth}:${sideVisible}`}
+      selectNode={s.selectEntity} selectEdge={(edge) => {
+        if (s.selectedEntity !== edge.from && s.selectedEntity !== edge.to) s.selectEntity(edge.from);
+        s.selectClaim(edge.id);
+        s.setMobilePanel("trace");
+      }} clearSelection={() => s.selectEntity(null)} />}
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-bg/90 px-4 pb-3 pt-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div>
+          <h2 className="font-serif text-xl leading-tight text-ink">{timeline ? "Time stream" : "Connection map"}</h2>
+          <p className="mt-1 text-[11px] text-muted">{neighborhoodRoot ? "Focused connections" : timeline ? "Main story in sequence" : "Explore relationships in 3D"} · {nodes.length} entities</p>
+        </div>
+        <div className="pointer-events-auto flex flex-wrap gap-2">
+          {timeline && sideCount > 0 && <button onClick={() => setShowSide((value) => !value)} aria-pressed={showSide}
+            className="min-h-8 border border-line px-2 text-xs text-theory">Side lore · {sideCount}</button>}
+          {neighborhoodRoot ? <>
+            <select aria-label="Connection depth" value={neighborhoodDepth}
+              onChange={(event) => s.setNeighborhoodDepth(Number(event.target.value) as 1 | 2)}
+              className="min-h-8 border border-line bg-panel px-2 text-xs text-ink">
+              <option value={1}>1 link</option><option value={2}>2 links</option>
+            </select>
+            <button onClick={() => s.showNeighborhood(null)} className="min-h-8 border border-ember px-2 text-xs text-ember">Full story</button>
+          </> : selectedEntity && nodes.some((node) => node.id === selectedEntity) &&
+            <button onClick={() => s.showNeighborhood(selectedEntity)} className="min-h-8 border border-ember px-2 text-xs text-ember">Focus connections</button>}
+        </div>
+      </div>
+      {timeline && storyIds.length > 0 && !neighborhoodRoot && <div className="pointer-events-auto mt-2 inline-flex border border-line bg-panel text-xs">
+        <button aria-label="Previous story step" onClick={() => stepBy(-1)} disabled={storyIndex <= 0} className="spatial-control px-2">←</button>
+        <button aria-label="Next story step" onClick={() => stepBy(1)} disabled={storyIndex >= storyIds.length - 1} className="spatial-control px-2">
+          {storyIndex < 0 ? "Start story" : "Next"} →
+        </button>
+      </div>}
+    </div>
+    {nodes.length === 0 && <div className="absolute inset-0 flex items-center justify-center p-6">
+      <div className="max-w-sm border-l-2 border-ember bg-panel p-6">
+        <h2 className="font-serif text-2xl leading-tight text-ink">{progress < 0 ? "Start with the main story." : "No matching lore"}</h2>
+        <p className="mt-3 text-sm text-muted">{progress < 0
+          ? "Unlock the first release when you’re ready to see its story."
+          : "Clear the filters to return to the story."}</p>
+        <button onClick={() => progress < 0 ? s.requestStage(universe.story[0].stage) : s.clearFilters()}
+          className="mt-5 min-h-10 bg-ember px-4 text-xs font-medium text-black">
+          {progress < 0 ? "Unlock the prologue" : "Clear filters"}
+        </button>
+      </div>
+    </div>}
+  </div>;
 }
