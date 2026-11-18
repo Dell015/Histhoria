@@ -53,7 +53,8 @@ npx next build         # run before calling anything done
 ```
 
 Verify UI changes in a real browser at desktop width and ~390px phone width,
-with screenshots. The last session verified desktop only.
+with screenshots. Use headless browser checks by default so Randel can keep
+his own browser open. Open a visible preview when he requests one.
 
 ## Data model (src/lib/types.ts)
 

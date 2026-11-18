@@ -3,6 +3,15 @@
 Add an entry for each change. Include what changed, why, verification,
 known limits, and follow-up work. Record any data format or migration.
 
+## 2026-11-19 · 3D timeline stream
+
+The waving strands and particles now have depth and share a fixed
+perspective camera. Front strands pass over the shaded backbone, while rear
+strands appear behind it. The view has no interaction controls. The black
+background, slow flow, and reduced-motion behavior carry over.
+Lint, 12 tests, and the production build passed. Headless Chrome confirmed
+desktop and 390px framing, animation, and a still frame for reduced motion.
+
 ## 2026-11-19 · Woven timeline stream
 
 Replaced the parallel tracks with a thick central backbone and three thinner
