@@ -6,7 +6,7 @@ import { connectionLayout, streamLayout } from "@/lib/spatial";
 import { useLore, useUniverse } from "@/lib/store";
 import { SpatialScene, type SceneEdge, type SceneNode } from "./SpatialScene";
 
-const verdictColors = { confirmed: "#8fc49a", partial: "#e5b84a", refuted: "#e0433a", open: "#5fb8a8" };
+const verdictColors = { confirmed: "#95d2a3", partial: "#f2b56b", refuted: "#f1938b", open: "#bca7ec" };
 
 export function Board() {
   const s = useLore();
@@ -24,7 +24,7 @@ export function Board() {
     const landmarks = new Map(universe.story.filter((step) => step.stage <= progress).map((step, index) =>
       [step.entityId, axis === "release" && timeline
         ? universe.stages.find((stage) => stage.order === step.stage)?.label ?? "Main story"
-        : `Story ${String(index + 1).padStart(2, "0")}`]));
+        : `Chapter ${index + 1}`]));
     const canon = sideVisible ? unlocked : mainClaims;
     const unlockedIds = new Set(canon.flatMap((claim) => [claim.subject, claim.object]));
     for (const id of landmarks.keys()) unlockedIds.add(id);
@@ -53,7 +53,7 @@ export function Board() {
     }));
     const edges: SceneEdge[] = links.map((claim) => ({
       id: claim.id, from: claim.subject, to: claim.object, label: claim.predicate,
-      color: claim.contradicts ? "#e0433a" : claim.track === "side" ? "#74bcad" : "#d9cfb8",
+      color: claim.contradicts ? "#f1938b" : claim.track === "side" ? "#79c9ba" : "#c2cadb",
       dashed: !!claim.contradicts,
       opacity: trace ? trace.claimIds.has(claim.id) ? 0.74 : 0.11 : 0.44,
     }));
@@ -75,57 +75,71 @@ export function Board() {
   const stepBy = (n: number) => {
     const id = storyIds[storyIndex + n];
     if (!id) return;
-    s.exploreEntity(id);
-    s.setMobilePanel(null);
+    s.exploreEntity(id, false);
   };
+  const stage = universe.stages.find((item) => item.order === progress);
+  const firstStage = universe.story[0]?.stage;
+  const locked = firstStage !== undefined && firstStage > progress && nodes.length === 0;
+  const storyStep = universe.story.find((step) => step.entityId === storyIds[Math.max(storyIndex, 0)]);
+  const canInspect = !!selectedEntity && nodes.some((node) => node.id === selectedEntity);
 
-  return <div className="relative h-full w-full">
-    {nodes.length > 0 && <SpatialScene timeline={timeline} positions={positions} nodes={nodes} edges={edges}
+  if (nodes.length === 0) return <div className="atlas-empty">
+    <div className="atlas-orbits" aria-hidden="true"><i /><i /><i /><b /><b /><b /></div>
+    <div className="atlas-empty-copy">
+      <h2>{locked ? "Start with the story" : "No matching lore"}</h2>
+      <p>{locked ? "Choose when to reveal the quests, characters, and connections in this chapter." : "Clear your filters to bring the lore back into view."}</p>
+      <button className="atlas-button atlas-primary" onClick={() => locked ? s.requestStage(firstStage) : s.clearFilters()}>
+        {locked ? "Open main story" : "Clear filters"} <span aria-hidden="true">→</span>
+      </button>
+    </div>
+  </div>;
+
+  return <div className="atlas-board-layout">
+    <div className="atlas-scene">
+      <SpatialScene timeline={timeline} positions={positions} nodes={nodes} edges={edges}
       storyIds={storyIds} selectedEntity={s.selectedEntity} selectedClaim={s.selectedClaim}
       focusRequest={s.focusRequest} neighborhood={!!neighborhoodRoot}
       frameKey={`${s.view}:${axis}:${progress}:${neighborhoodRoot}:${neighborhoodDepth}:${sideVisible}`}
       selectNode={s.selectEntity} selectEdge={(edge) => {
         if (s.selectedEntity !== edge.from && s.selectedEntity !== edge.to) s.selectEntity(edge.from);
         s.selectClaim(edge.id);
-        s.setMobilePanel("trace");
-      }} clearSelection={() => s.selectEntity(null)} />}
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-bg/90 px-4 pb-3 pt-4">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        s.setOpenPanel("trace");
+      }} clearSelection={() => s.selectEntity(null)} />
+      <div className="atlas-scene-tools">
+        <p className="atlas-scene-caption">{neighborhoodRoot ? "Focused connections" : timeline ? "Timeline" : "All connections"}</p>
         <div>
-          <h2 className="font-serif text-xl leading-tight text-ink">{timeline ? "Time stream" : "Connection map"}</h2>
-          <p className="mt-1 text-[11px] text-muted">{neighborhoodRoot ? "Focused connections" : timeline ? "Main story in sequence" : "Explore relationships in 3D"} · {nodes.length} entities</p>
-        </div>
-        <div className="pointer-events-auto flex flex-wrap gap-2">
           {timeline && sideCount > 0 && <button onClick={() => setShowSide((value) => !value)} aria-pressed={showSide}
-            className="min-h-8 border border-line px-2 text-xs text-theory">Side lore · {sideCount}</button>}
+            className="atlas-button">Side lore{!showSide && " off"}</button>}
           {neighborhoodRoot ? <>
             <select aria-label="Connection depth" value={neighborhoodDepth}
               onChange={(event) => s.setNeighborhoodDepth(Number(event.target.value) as 1 | 2)}
-              className="min-h-8 border border-line bg-panel px-2 text-xs text-ink">
+              className="atlas-button">
               <option value={1}>1 link</option><option value={2}>2 links</option>
             </select>
-            <button onClick={() => s.showNeighborhood(null)} className="min-h-8 border border-ember px-2 text-xs text-ember">Full story</button>
-          </> : selectedEntity && nodes.some((node) => node.id === selectedEntity) &&
-            <button onClick={() => s.showNeighborhood(selectedEntity)} className="min-h-8 border border-ember px-2 text-xs text-ember">Focus connections</button>}
+            <button onClick={() => s.showNeighborhood(null)} className="atlas-button">Show all</button>
+          </> : null}
         </div>
       </div>
-      {timeline && storyIds.length > 0 && !neighborhoodRoot && <div className="pointer-events-auto mt-2 inline-flex border border-line bg-panel text-xs">
-        <button aria-label="Previous story step" onClick={() => stepBy(-1)} disabled={storyIndex <= 0} className="spatial-control px-2">←</button>
-        <button aria-label="Next story step" onClick={() => stepBy(1)} disabled={storyIndex >= storyIds.length - 1} className="spatial-control px-2">
-          {storyIndex < 0 ? "Start story" : "Next"} →
-        </button>
-      </div>}
     </div>
-    {nodes.length === 0 && <div className="absolute inset-0 flex items-center justify-center p-6">
-      <div className="max-w-sm border-l-2 border-ember bg-panel p-6">
-        <h2 className="font-serif text-2xl leading-tight text-ink">{progress < 0 ? "Start with the main story." : "No matching lore"}</h2>
-        <p className="mt-3 text-sm text-muted">{progress < 0
-          ? "Unlock the first release when you’re ready to see its story."
-          : "Clear the filters to return to the story."}</p>
-        <button onClick={() => progress < 0 ? s.requestStage(universe.story[0].stage) : s.clearFilters()}
-          className="mt-5 min-h-10 bg-ember px-4 text-xs font-medium text-black">
-          {progress < 0 ? "Unlock the prologue" : "Clear filters"}
-        </button>
+    {timeline && storyStep && !neighborhoodRoot ? <div className="atlas-story-dock">
+      <div className="atlas-dock-copy" aria-live="polite">
+        <p>Chapter {universe.story.indexOf(storyStep) + 1} of {universe.story.length}</p>
+        <h2>{storyStep.title}</h2>
+        <p>{storyStep.summary}</p>
+      </div>
+      <div className="atlas-dock-actions">
+        <button className="atlas-button atlas-chapters-trigger" onClick={() => s.setOpenPanel("chapters")}>Chapters</button>
+        {canInspect && <button className="atlas-button" onClick={() => s.setOpenPanel("trace")}>Details</button>}
+        {storyIndex > 0 && <button className="atlas-button atlas-arrow" aria-label="Previous chapter" onClick={() => stepBy(-1)}>←</button>}
+        {storyIndex < storyIds.length - 1 && <button className="atlas-button atlas-primary" onClick={() => stepBy(1)}>
+          {storyIndex < 0 ? "Start story" : "Next chapter"} <span aria-hidden="true">→</span>
+        </button>}
+      </div>
+    </div> : <div className="atlas-map-dock">
+      <span>{canInspect ? universe.entities.find((entity) => entity.id === selectedEntity)?.name : stage?.label}</span>
+      <div className="atlas-dock-actions">
+        <button className="atlas-button atlas-chapters-trigger" onClick={() => s.setOpenPanel("chapters")}>Chapters</button>
+        {canInspect && <button className="atlas-button" onClick={() => s.setOpenPanel("trace")}>Details</button>}
       </div>
     </div>}
   </div>;

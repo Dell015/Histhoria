@@ -2,15 +2,15 @@
 
 ## Explore lore
 
-- **Time stream** follows the main story in the order shown on the left.
-  **Release order** groups story milestones by when they became available.
-  The orange line guides navigation. Select a milestone or use **Next story
-  step** and **Previous story step** to follow the story. **Side lore** appears
+- **Time stream** opens on the main story. Follow it using the chapter list,
+  **Start story**, or **Next chapter**. Use **View options** to choose release
+  order and group milestones by when they became available. The amber line
+  guides navigation. **Side lore** appears
   when the current release includes curated side claims. Emberfall's
   `1.2 · Lanterns` is an example.
 - **Connection map** shows the same unlocked claims as 3D points and links.
   Select a point to inspect its incoming and outgoing claims. Select an arrow
-  to open the corresponding claim if it is canon. Use **Focus connections**
+  to open the corresponding claim if it is canon. In Details, use **Focus connections**
   to see one or two links around the selected entity.
 - Drag an empty area to orbit. Shift-drag pans. Scroll, pinch, or use the
   zoom buttons. **Reset** fits the visible points. With the scene focused,
@@ -18,13 +18,16 @@
   Tab reaches visible points and their buttons open the trace.
 
 Both views respect the active universe, spoiler shield, and filters. Search
-and story navigation jump to the selected point. When using a phone, switch
-between the board, main story, and trace with the bottom tabs.
+and story navigation jump to the selected point. On phones, use **Chapters**
+below an unlocked board. Search and details appear in a sheet. Use **/**
+or **Ctrl/Cmd+K** to open search with a keyboard, and **Escape** to dismiss
+the active sheet.
 
 ## Attach evidence
 
-1. Select an entity and find a canon claim under **Came from** or **Leads to**.
-2. Select **View or attach evidence** and choose **File** or **Link**.
+1. Select a point or choose **Details** on a chapter. Find a canon claim
+   under **Came from** or **Leads to**.
+2. Select **Evidence** and choose **File** or **Link**.
 3. Add an optional title and a note or timestamp, then choose **Attach
    evidence**. You can download or remove saved files from the same claim.
 

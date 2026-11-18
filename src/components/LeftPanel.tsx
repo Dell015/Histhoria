@@ -27,7 +27,7 @@ function Chip({ on, onClick, children, color }: { on: boolean; onClick: () => vo
   );
 }
 
-function Filters() {
+export function LoreSearch() {
   const s = useLore();
   const universe = useUniverse();
   const unlocked = visibleEntityIds(universe, s.progress);
@@ -37,28 +37,24 @@ function Filters() {
   const active = s.kinds.length + s.sourceKinds.length + (s.region ? 1 : 0) + (s.query ? 1 : 0);
 
   return (
-    <section className="border-b border-line p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="eyebrow">Filters</span>
-        {active > 0 && (
-          <button onClick={s.clearFilters} className="text-[11px] text-muted hover:text-ink">
-            clear {active}
-          </button>
-        )}
-      </div>
+    <section className="atlas-search-content">
       <input
+        data-sheet-focus
         aria-label="Search unlocked names"
         value={s.query}
         onChange={(e) => s.setQuery(e.target.value)}
-        placeholder="Search names…"
-        className="w-full border border-line bg-bg px-2.5 py-1.5 text-sm text-ink outline-none placeholder:text-muted focus:border-ember"
+        placeholder="Find a person, place, or event…"
+        className="atlas-input"
       />
       {s.query.trim() && <div className="mt-2 border border-line" aria-label="Search results">
         {results.length ? results.slice(0, 8).map((entity) => <button key={entity.id} onClick={() => s.exploreEntity(entity.id)}
           className="block min-h-10 w-full border-b border-line px-3 py-2 text-left text-xs text-ink last:border-0 hover:bg-panel2">
-          {entity.name} <span className="float-right text-ember">jump ↗</span>
+          {entity.name} <span className="float-right text-muted">{KIND_LABEL[entity.kind]}</span>
         </button>) : <p className="p-3 text-xs text-muted">No unlocked matches.</p>}
       </div>}
+      <details className="atlas-disclosure">
+        <summary>Filters {active > 0 && <span>· {active} active</span>}</summary>
+        <div className="px-3 pb-3">
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(Object.keys(KIND_LABEL) as EntityKind[]).map((k) => (
           <Chip key={k} on={s.kinds.includes(k)} onClick={() => s.toggleKind(k)} color={KIND_COLOR[k]}>
@@ -90,6 +86,9 @@ function Filters() {
           </option>
         ))}
       </select>
+        {active > 0 && <button onClick={s.clearFilters} className="mt-3 text-xs text-ember underline">Clear filters</button>}
+        </div>
+      </details>
     </section>
   );
 }
@@ -167,7 +166,7 @@ function AddClaim({ theory }: { theory: Theory }) {
   );
 }
 
-function Theories() {
+export function Theories() {
   const s = useLore();
   const universe = useUniverse();
   const ents = entityMap(universe);
@@ -275,40 +274,23 @@ function Theories() {
   );
 }
 
-function MainStory() {
+export function MainStory({ inSheet = false }: { inSheet?: boolean }) {
   const universe = useUniverse();
   const s = useLore();
-  return <section className="border-b border-line p-4">
-    <div className="eyebrow !text-ember">Start here · canon</div>
-    <h1 className="mt-1 font-serif text-2xl text-ink">The main story</h1>
-    <p className="mt-2 text-xs leading-relaxed text-muted">{universe.tagline}</p>
-    <ol className="mt-4 border-l border-line">
+  return <section className="atlas-chapters">
+    {!inSheet && <h2>Main story</h2>}
+    <ol>
       {universe.story.map((step, index) => {
         const locked = step.stage > s.progress;
         return <li key={step.id}>
-          <button onClick={() => locked ? s.requestStage(step.stage) : s.exploreEntity(step.entityId)}
-            className={`flex w-full gap-3 border-l-2 px-3 py-3 text-left hover:bg-panel2 ${s.selectedEntity === step.entityId ? "border-ember bg-panel2" : "border-transparent"}`}>
-            <span className="pt-0.5 font-mono text-[10px] text-ember">{String(index + 1).padStart(2, "0")}</span>
-            <span><span className="block font-serif text-[15px] leading-snug text-ink">{locked ? `Part ${index + 1} · behind the shield` : step.title}</span>
-              <span className="mt-1 block text-[11px] leading-relaxed text-muted">{locked ? "Unlock the release to follow this part." : step.summary}</span></span>
+          <button onClick={() => locked ? s.requestStage(step.stage) : s.exploreEntity(step.entityId, false)}
+            aria-current={s.selectedEntity === step.entityId ? "step" : undefined}>
+            <span className="chapter-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+            <span className="chapter-copy"><span>{locked ? `Chapter ${index + 1}` : step.title}</span>
+              {locked && <small>Hidden by spoiler shield</small>}</span>
           </button>
         </li>;
       })}
     </ol>
-    {!universe.storyComplete && <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
-      The main story is still being mapped. Canon side lore comes later; theory branches open after the main story is complete.
-    </p>}
   </section>;
-}
-
-export function LeftPanel() {
-  const panel = useLore((s) => s.mobilePanel);
-  const universe = useUniverse();
-  return (
-    <aside aria-label="Main story and exploration" className={`${panel === "explore" ? "block" : "hidden"} w-full shrink-0 overflow-y-auto border-r border-line bg-panel lg:block lg:w-72 xl:w-80`}>
-      <MainStory />
-      <Filters />
-      {universe.storyComplete && <Theories />}
-    </aside>
-  );
 }

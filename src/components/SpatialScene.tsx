@@ -80,6 +80,7 @@ export function SpatialScene(props: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const contacts = useRef(new Map<number, { x: number; y: number }>());
   const moved = useRef(false);
+  const animation = useRef(0);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [camera, setCamera] = useState<Camera>(() => fitCamera([], timeline, { width: 640, height: 480 }));
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
@@ -100,30 +101,61 @@ export function SpatialScene(props: Props) {
     return point ? [point] : [];
   }), timeline, size), [nodes, positions, size, timeline]);
 
-  const pending = useRef({ frameKey: "", focusRequest: -1 });
+  const pending = useRef({ frameKey: "", focusRequest: -1, width: 0, height: 0, focus: false });
   useEffect(() => {
     if (!size.width || !size.height) return;
     const changedFrame = pending.current.frameKey !== frameKey;
     const movedFocus = pending.current.focusRequest !== focusRequest;
-    if (!changedFrame && !movedFocus) return;
-    const target = selectedEntity && !neighborhood && nodes.some((node) => node.id === selectedEntity) && positions.get(selectedEntity);
-    // The scene can be hidden by a phone panel. Apply navigation when it has dimensions.
-    const frame = requestAnimationFrame(() => {
-      pending.current = { frameKey, focusRequest };
-      setCamera(target ? { ...fit, target, distance: Math.min(fit.distance, size.width < 480 ? 400 : 500) } : fit);
+    const resized = pending.current.width !== size.width || pending.current.height !== size.height;
+    if (!changedFrame && !movedFocus && !resized) return;
+    const focus = movedFocus || (!changedFrame && pending.current.focus);
+    const target = focus && selectedEntity && !neighborhood
+      && nodes.some((node) => node.id === selectedEntity) && positions.get(selectedEntity);
+    const destination = target ? { ...fit, target, distance: Math.min(fit.distance, size.width < 480 ? 440 : 540) } : fit;
+    cancelAnimationFrame(animation.current);
+    animation.current = requestAnimationFrame(() => {
+      pending.current = { frameKey, focusRequest, width: size.width, height: size.height, focus: Boolean(target) };
       setHoveredEdge(null);
+      if (changedFrame || resized || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setCamera(destination);
+        return;
+      }
+      // Use the current orbit angle for chapter jumps. Pointer input cancels the glide.
+      let previous = performance.now();
+      const end = previous + 260;
+      function glide(now: number) {
+        const amount = now >= end ? 1 : Math.min(1, (now - previous) / Math.max(end - previous, 1) * 2.1);
+        previous = now;
+        setCamera((camera) => ({
+          ...camera,
+          target: {
+            x: camera.target.x + (destination.target.x - camera.target.x) * amount,
+            y: camera.target.y + (destination.target.y - camera.target.y) * amount,
+            z: camera.target.z + (destination.target.z - camera.target.z) * amount,
+          },
+          distance: camera.distance + (destination.distance - camera.distance) * amount,
+        }));
+        if (amount < 1) animation.current = requestAnimationFrame(glide);
+      }
+      animation.current = requestAnimationFrame(glide);
     });
-    return () => cancelAnimationFrame(frame);
   }, [fit, frameKey, focusRequest, neighborhood, nodes, positions, selectedEntity, size.height, size.width]);
+  useEffect(() => () => cancelAnimationFrame(animation.current), []);
 
-  const zoom = (multiplier: number) => setCamera((value) => ({
-    ...value, distance: clamp(value.distance * multiplier, 165, Math.max(3000, fit.distance * 5)),
-  }));
+  const zoom = (multiplier: number) => {
+    cancelAnimationFrame(animation.current);
+    setCamera((value) => ({ ...value, distance: clamp(value.distance * multiplier, 165, Math.max(3000, fit.distance * 5)) }));
+  };
+  const reset = () => {
+    cancelAnimationFrame(animation.current);
+    setCamera(fit);
+  };
   useEffect(() => {
     const element = surface.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
       event.preventDefault();
+      cancelAnimationFrame(animation.current);
       const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
       setCamera((value) => ({ ...value, distance: clamp(value.distance * Math.exp(clamp(delta, -140, 140) * 0.0025), 165, Math.max(3000, fit.distance * 5)) }));
     };
@@ -179,11 +211,15 @@ export function SpatialScene(props: Props) {
     const element = canvas.current;
     if (!element || !size.width || !size.height) return;
     const ratio = Math.min(2, window.devicePixelRatio || 1);
-    element.width = Math.round(size.width * ratio);
-    element.height = Math.round(size.height * ratio);
+    const pixelsWide = Math.round(size.width * ratio);
+    const pixelsHigh = Math.round(size.height * ratio);
+    if (element.width !== pixelsWide) element.width = pixelsWide;
+    if (element.height !== pixelsHigh) element.height = pixelsHigh;
     const ctx = element.getContext("2d");
     if (!ctx) return;
-    ctx.scale(ratio, ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, size.width, size.height);
+    ctx.globalAlpha = 1;
 
     const spine = storyIds.map((id) => positions.get(id)).filter((p): p is Point3 => !!p);
     if (timeline && spine.length) {
@@ -200,14 +236,14 @@ export function SpatialScene(props: Props) {
         ctx.lineWidth = width;
         ctx.stroke();
       }
-      for (let z = -150; z <= 150; z += 50) guide({ x: first, y: -140, z }, { x: last, y: -140, z }, "rgba(199,154,104,.10)", 1);
+      for (let z = -150; z <= 150; z += 50) guide({ x: first, y: -140, z }, { x: last, y: -140, z }, "rgba(145,172,229,.12)", 1);
       const stride = Math.max(65, (last - first) / 38);
-      for (let x = first; x <= last; x += stride) guide({ x, y: -140, z: -150 }, { x, y: -140, z: 150 }, "rgba(199,154,104,.10)", 1);
-      for (const point of spine) guide(point, { ...point, y: -140 }, "rgba(232,116,59,.27)", 1);
+      for (let x = first; x <= last; x += stride) guide({ x, y: -140, z: -150 }, { x, y: -140, z: 150 }, "rgba(145,172,229,.12)", 1);
+      for (const point of spine) guide(point, { ...point, y: -140 }, "rgba(242,181,107,.28)", 1);
       const a = spine[0];
       const b = spine[spine.length - 1];
-      guide({ ...a, x: a.x - 108 }, { ...b, x: b.x + 108 }, "rgba(232,116,59,.12)", 14);
-      guide({ ...a, x: a.x - 108 }, { ...b, x: b.x + 108 }, "rgba(232,116,59,.58)", 1.5);
+      guide({ ...a, x: a.x - 108 }, { ...b, x: b.x + 108 }, "rgba(242,181,107,.10)", 13);
+      guide({ ...a, x: a.x - 108 }, { ...b, x: b.x + 108 }, "rgba(242,181,107,.68)", 1.5);
     }
 
     for (const { edge, shape } of lines) {
@@ -216,7 +252,7 @@ export function SpatialScene(props: Props) {
       ctx.beginPath();
       ctx.moveTo(shape.x1, shape.y1);
       ctx.quadraticCurveTo(shape.cx, shape.cy, shape.x2, shape.y2);
-      ctx.strokeStyle = picked ? "#f19561" : edge.color;
+      ctx.strokeStyle = picked ? "#f2b56b" : edge.color;
       ctx.lineWidth = picked ? 2.3 : 1.2;
       ctx.globalAlpha = picked ? 1 : edge.opacity;
       ctx.setLineDash(edge.dashed ? [5, 5] : []);
@@ -246,6 +282,7 @@ export function SpatialScene(props: Props) {
 
   function pointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+    cancelAnimationFrame(animation.current);
     if (contacts.current.size === 0) moved.current = false;
     contacts.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -302,8 +339,9 @@ export function SpatialScene(props: Props) {
         if (event.target !== event.currentTarget) return;
         if (event.key === "+" || event.key === "=") zoom(0.81);
         else if (event.key === "-") zoom(1.23);
-        else if (event.key === "Home") setCamera(fit);
+        else if (event.key === "Home") reset();
         else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+          cancelAnimationFrame(animation.current);
           setCamera((value) => ({
             ...value, yaw: value.yaw + (event.key === "ArrowLeft" ? 0.15 : event.key === "ArrowRight" ? -0.15 : 0),
             pitch: clamp(value.pitch + (event.key === "ArrowUp" ? -0.12 : event.key === "ArrowDown" ? 0.12 : 0), -1.42, 1.42),
@@ -313,7 +351,7 @@ export function SpatialScene(props: Props) {
       }}>
       <canvas ref={canvas} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />
       {orderedNodes.map(({ node, point, selected, showLabel }, index) => {
-        const color = node.landmark ? "#ec8d58" : node.sideOnly ? "#74bcad" : KIND_COLOR[node.kind];
+        const color = node.landmark ? "#f2b56b" : node.sideOnly ? "#79c9ba" : KIND_COLOR[node.kind];
         return <button key={node.id} type="button" aria-label={node.name} aria-pressed={selected}
           title={node.name}
           style={{ left: point.x, top: point.y, zIndex: orderedNodes.length - index, color }}
@@ -326,12 +364,12 @@ export function SpatialScene(props: Props) {
       })}
     </div>
     <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-end justify-between gap-2 pointer-events-none">
-      <div className="pointer-events-auto flex border border-line bg-panel" aria-label="3D camera controls">
-        <button onClick={() => zoom(0.81)} className="spatial-control" aria-label="Zoom in">+</button>
-        <button onClick={() => zoom(1.23)} className="spatial-control" aria-label="Zoom out">−</button>
-        <button onClick={() => setCamera(fit)} className="spatial-control px-3 text-xs" aria-label="Reset camera">Reset</button>
+      <div className="pointer-events-auto flex overflow-hidden rounded-lg border border-line bg-panel" aria-label="3D camera controls">
+        <button onClick={() => zoom(0.81)} className="spatial-control" aria-label="Zoom in" title="Zoom in">+</button>
+        <button onClick={() => zoom(1.23)} className="spatial-control" aria-label="Zoom out" title="Zoom out">−</button>
+        <button onClick={reset} className="spatial-control px-3 text-xs" aria-label="Reset camera">Reset</button>
       </div>
-      <div className="bg-bg/80 px-2 py-1 text-right text-[11px] text-muted">{activeLabel || "Drag to orbit · Scroll or pinch to zoom"}</div>
+      <div className="rounded bg-bg/80 px-2 py-1 text-right text-[11px] text-muted">{activeLabel || "Drag to orbit"}</div>
     </div>
   </>;
 }

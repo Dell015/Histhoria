@@ -24,15 +24,17 @@ Mondstadt prologue (Acts I–III): 23 sourced claims, with links explicitly
 labeled as community quest transcripts. This is not the full Genshin story.
 See `docs/GENSHIN_RESEARCH.md` for the sources, limits, and next research target.
 
-Use **Time stream** to follow the main story by story or release order.
+Use **Time stream** to follow the main story chapter by chapter.
 **Connection map** opens an orbitable 3D map of the same lore. Select a point
-to trace its claims or use **Focus these connections** to narrow the view.
-In Trace & sources, open a claim’s evidence panel to add files or links.
+or choose **Details** to trace claims and attach evidence. Use the search
+button or `/` to find lore. The top **View options** menu has release order,
+spoiler progress, and eligible theory branches.
 See [3D views and evidence](docs/3D_AND_EVIDENCE.md) for controls and limits
 and [Change log](docs/CHANGES.md) for project history.
 
-Phones have Board, Main story & explore, and Trace & sources tabs. Progress
-and forks save separately per universe in localStorage. Existing Emberfall
+Phones have a **Chapters** button below the board. Details, search, and
+settings open as sheets. Progress and forks save separately per universe
+in localStorage. Existing Emberfall
 saves retain their original `histhoria-v1` key; Genshin uses `histhoria-v1:genshin`.
 
 ```bash

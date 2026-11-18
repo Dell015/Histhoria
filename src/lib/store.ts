@@ -35,6 +35,8 @@ function save(universeId: string, s: Saved) {
   }
 }
 
+export type WorkspacePanel = "chapters" | "explore" | "trace" | "settings" | "theories";
+
 interface State {
   universeId: string;
   hydrated: boolean;
@@ -52,7 +54,7 @@ interface State {
   neighborhoodRoot: string | null;
   neighborhoodDepth: 1 | 2;
   focusRequest: number;
-  mobilePanel: "explore" | "trace" | null;
+  openPanel: WorkspacePanel | null;
 
   kinds: EntityKind[];
   sourceKinds: SourceKind[];
@@ -63,10 +65,10 @@ interface State {
 
   hydrate: () => void;
   setUniverse: (id: string) => void;
-  exploreEntity: (id: string) => void;
+  exploreEntity: (id: string, inspect?: boolean) => void;
   showNeighborhood: (id: string | null) => void;
   setNeighborhoodDepth: (depth: 1 | 2) => void;
-  setMobilePanel: (panel: State["mobilePanel"]) => void;
+  setOpenPanel: (panel: WorkspacePanel | null) => void;
   requestStage: (n: number) => void;
   confirmStage: () => void;
   cancelStage: () => void;
@@ -102,7 +104,7 @@ export const useLore = create<State>((set, get) => ({
   neighborhoodRoot: null,
   neighborhoodDepth: 1,
   focusRequest: 0,
-  mobilePanel: null,
+  openPanel: null,
   kinds: [],
   sourceKinds: [],
   region: "",
@@ -127,23 +129,21 @@ export const useLore = create<State>((set, get) => ({
       universeId: id, progress: saved?.progress ?? universe.initialProgress ?? 0,
       userTheories: saved?.userTheories ?? [], pendingStage: null,
       selectedEntity: null, selectedClaim: null, activeTheoryId: null,
-      neighborhoodRoot: null, neighborhoodDepth: 1, mobilePanel: null,
+      neighborhoodRoot: null, neighborhoodDepth: 1, openPanel: null,
       kinds: [], sourceKinds: [], region: "", query: "", view: "timeline", axis: "story",
     });
   },
-  exploreEntity: (id) => set((s) => ({
+  exploreEntity: (id, inspect = true) => set((s) => ({
     selectedEntity: id, selectedClaim: null, query: "", kinds: [], sourceKinds: [], region: "",
     neighborhoodRoot: s.neighborhoodRoot ? id : null,
-    focusRequest: s.focusRequest + 1, mobilePanel: "trace",
+    focusRequest: s.focusRequest + 1, openPanel: inspect ? "trace" : null,
   })),
   showNeighborhood: (id) => set((s) => ({
     neighborhoodRoot: id, selectedEntity: id, selectedClaim: null,
     kinds: [], sourceKinds: [], region: "", query: "", focusRequest: s.focusRequest + 1,
   })),
   setNeighborhoodDepth: (neighborhoodDepth) => set({ neighborhoodDepth }),
-  setMobilePanel: (mobilePanel) => set((s) => ({ mobilePanel,
-    focusRequest: mobilePanel === null && s.selectedEntity ? s.focusRequest + 1 : s.focusRequest,
-  })),
+  setOpenPanel: (openPanel) => set({ openPanel }),
 
   requestStage: (n) => {
     if (!universes[get().universeId].stages.some((stage) => stage.order === n)) return;
@@ -164,7 +164,7 @@ export const useLore = create<State>((set, get) => ({
 
   setView: (view) => set({ view }),
   setAxis: (axis) => set({ axis }),
-  selectEntity: (id) => set({ selectedEntity: id, selectedClaim: null, mobilePanel: id ? "trace" : null }),
+  selectEntity: (id) => set({ selectedEntity: id, selectedClaim: null, openPanel: id ? "trace" : null }),
   selectClaim: (id) => set({ selectedClaim: id }),
   setActiveTheory: (id) => set({ activeTheoryId: id }),
 

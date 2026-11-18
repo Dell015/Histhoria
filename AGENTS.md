@@ -23,9 +23,10 @@ and business are deliberately deferred). "Histhoria" is a working title.
 - He is upskilling. After a non-trivial change add 1 to 3 lines: the concept
   and why this approach beat the alternative. When there is a real trade-off,
   give two options and a one-line recommendation.
-- Take design initiative. He wants a committed, distinct look, never generic.
-  Current look: near-black, ember orange accent, serif names, mono eyebrow
-  labels. Do not drift to template gradients or pill cards.
+- Take design initiative. Histhoria uses midnight blue, warm ivory, serif
+  story titles, and quiet controls. Amber marks the main story and selection.
+  Sea glass marks canon side lore, and lavender marks open theories. Keep the
+  main story easy to start and put specialist controls in contextual panels.
 - Find the root cause, state it in a sentence or two, then fix. No symptom patches.
 - Be honest about what was not tested. Never say "fixed" without checking.
 - Start working in the first reply. Only ask when the answer changes what gets built.

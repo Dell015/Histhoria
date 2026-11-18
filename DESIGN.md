@@ -67,6 +67,23 @@ claim, so no one ever has to resolve text conflicts.
 
 ## What is built
 
+### Story-first workspace
+
+The first view pairs the timeline with a chapter path and puts the active
+chapter's summary and next step beneath the board. Search and filters share
+one panel. Settings, spoiler confirmation, and selected lore open only when
+requested. The chapter path becomes a sheet on phones. Both 3D views and
+the source and evidence actions use the same selection workflow.
+
+This follows the principle of [progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/).
+The contextual details draw on [Linear’s Peek](https://linear.app/changelog/2019-09-23-improved-peek),
+and the focused graph draws on [Obsidian’s Local Graph](https://obsidian.md/help/plugins/graph).
+Histhoria uses its own visual language and keeps the story path as the default.
+
+Midnight blue frames the board. Warm ivory is the text color and amber marks
+the story spine and selection. Sea glass is for authored side lore, lavender
+for open theories, and coral for contradictions.
+
 ### 3D views and evidence
 
 Both views project the same filtered lore onto a canvas with keyboard

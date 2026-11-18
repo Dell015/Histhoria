@@ -130,7 +130,7 @@ export function ClaimEvidence({ universeId, claimId }: { universeId: string; cla
       <input name="title" aria-label="Evidence title" placeholder="Title (optional)" maxLength={120} disabled={busy} className={inputClass} />
       <input name="note" aria-label="Evidence note" placeholder="Note or timestamp (optional)" maxLength={350} disabled={busy} className={inputClass} />
       {mode === "file" && <p className="text-[10px] text-muted">Images, short clips, audio, or other files up to 50 MiB.</p>}
-      <button disabled={!ready || busy} type="submit" className="min-h-9 w-full border border-ember px-3 text-xs text-ember hover:bg-ember/10 disabled:opacity-40">
+      <button disabled={!ready || busy} type="submit" className="atlas-button atlas-primary w-full">
         {busy ? "Saving…" : "Attach evidence"}
       </button>
       {error && <p role="alert" className="text-xs text-contra">{error}</p>}
